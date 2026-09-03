@@ -4,7 +4,7 @@
 
 const SECTIONS = ["Herbs", "Flowers", "Other Produce"];
 
-let tab = "settings", sent = null, addingTo = null, adminKey = "";
+let tab = "settings", sent = null, addingTo = null, adminKey = "", summaryWeek = null;
 let config = {}, catalog = [], crops = [], orders = [], claimedMap = {};
 let draft = {};
 let booted = false;
@@ -125,6 +125,7 @@ function render() {
   if (MODE === "restaurant") v.innerHTML = orderFormHTML(false);
   else if (tab === "form") v.innerHTML = orderFormHTML(true);
   else if (tab === "settings") v.innerHTML = settingsHTML();
+  else if (tab === "summary") v.innerHTML = summaryHTML();
   else v.innerHTML = ordersHTML();
 }
 
@@ -291,6 +292,83 @@ function ordersHTML() {
       <td class="num">${money(r.price)}</td>
       <td class="num">${r.qty}</td><td class="num">${money(r.lineTotal)}</td></tr>`;
   });
+  return h + `</tbody></table></div>`;
+}
+
+function summaryHTML() {
+  const allWeeks = [...new Set(orders.map(r => r.weekKey))].sort((a, b) => b.localeCompare(a));
+  const currentWk = weekDates().mon.toISOString().slice(0, 10);
+  if (!summaryWeek || !allWeeks.includes(summaryWeek))
+    summaryWeek = allWeeks.includes(currentWk) ? currentWk : (allWeeks[0] || currentWk);
+
+  let h = `<p class="lede">One row per company — quantities ordered per crop and total owed for the selected week.</p>`;
+
+  if (allWeeks.length) {
+    h += `<div class="toolbar"><label for="sumWeek" style="font-size:13px;color:var(--muted);margin-right:8px">Week of</label>
+      <select class="inp" id="sumWeek" style="width:auto">`;
+    allWeeks.forEach(wk => {
+      h += `<option value="${esc(wk)}"${wk === summaryWeek ? " selected" : ""}>${esc(wk)}</option>`;
+    });
+    h += `</select></div>`;
+  }
+
+  const wkRows = orders.filter(r => r.weekKey === summaryWeek);
+  if (!wkRows.length) return h + `<div class="panel"><div class="empty">
+    <b>No orders for this week yet</b>Orders placed by restaurants will appear here once
+    the week is active.</div></div>`;
+
+  const companies = [...new Set(wkRows.map(r => r.restaurant))].sort();
+
+  const cropMeta = {};
+  wkRows.forEach(r => { cropMeta[r.cropId] = { name: r.name, section: r.section, unit: r.unit, price: r.price }; });
+  const cropIds = Object.keys(cropMeta).sort((a, b) => {
+    const si = SECTIONS.indexOf(cropMeta[a].section), sj = SECTIONS.indexOf(cropMeta[b].section);
+    return si !== sj ? si - sj : cropMeta[a].name.localeCompare(cropMeta[b].name);
+  });
+
+  const matrix = {}, companyTotal = {};
+  wkRows.forEach(r => {
+    if (!matrix[r.restaurant]) matrix[r.restaurant] = {};
+    const cell = matrix[r.restaurant][r.cropId] || { qty: 0, lineTotal: 0 };
+    cell.qty += r.qty; cell.lineTotal += r.lineTotal;
+    matrix[r.restaurant][r.cropId] = cell;
+    companyTotal[r.restaurant] = (companyTotal[r.restaurant] || 0) + r.lineTotal;
+  });
+
+  const weekTotal = wkRows.reduce((s, r) => s + r.lineTotal, 0);
+  h += `<div class="stats">
+    <div class="stat"><span class="lab">Week revenue</span><b>${money(weekTotal)}</b></div>
+    <div class="stat"><span class="lab">Companies</span><b>${companies.length}</b></div>
+  </div>`;
+
+  h += `<div class="scroll"><table><thead><tr>
+    <th>Company</th><th>Contact</th><th>Fulfillment</th>`;
+  cropIds.forEach(id => {
+    h += `<th class="num">${esc(cropMeta[id].name)}
+      <div class="colsub">${esc(cropMeta[id].unit)} · ${money(cropMeta[id].price)}</div></th>`;
+  });
+  h += `<th class="num">Total owed</th></tr></thead><tbody>`;
+
+  companies.forEach(company => {
+    const info = wkRows.find(r => r.restaurant === company);
+    h += `<tr><td><b>${esc(company)}</b></td>
+      <td>${esc(info.contact)}<div class="colsub">${esc(info.phone)}</div></td>
+      <td>${esc(info.fulfillment)}${info.deliveryAddress
+        ? `<div class="colsub addr">${esc(info.deliveryAddress)}</div>` : ""}</td>`;
+    cropIds.forEach(id => {
+      const cell = (matrix[company] || {})[id];
+      h += cell ? `<td class="num">${cell.qty}</td>` : `<td class="num dim">—</td>`;
+    });
+    h += `<td class="num"><b>${money(companyTotal[company] || 0)}</b></td></tr>`;
+  });
+
+  h += `<tr class="sumrow"><td colspan="3"><b>Total</b></td>`;
+  cropIds.forEach(id => {
+    const total = wkRows.filter(r => r.cropId === id).reduce((s, r) => s + r.qty, 0);
+    h += `<td class="num"><b>${total}</b></td>`;
+  });
+  h += `<td class="num"><b>${money(weekTotal)}</b></td></tr>`;
+
   return h + `</tbody></table></div>`;
 }
 
@@ -472,6 +550,7 @@ document.addEventListener("change", e => {
     if (wrap) wrap.style.display = t.value === "Delivery" ? "" : "none";
   }
   if (t.id === "oTerms") draft._terms = t.checked;
+  if (t.id === "sumWeek") { summaryWeek = t.value; render(); }
 });
 
 boot();
