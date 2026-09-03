@@ -109,3 +109,9 @@ Thyme at "$7 / 0.5 lb" is $14/lb — right inside the $13.80–$15.00 band your 
 — but the chef has to work that out. Listing it as **$14 per lb, half-pound minimum** is
 the same money in the number they already know. The unit field is free text, so you can
 change it whenever you want to try it.
+
+## Customer facing URL
+https://sauuyer.github.io/farming-falmouth-specialty-crops-order-tools/
+
+## Farmer facing URL
+https://sauuyer.github.io/farming-falmouth-specialty-crops-order-tools/admin.html
