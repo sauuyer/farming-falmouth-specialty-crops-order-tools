@@ -1,5 +1,5 @@
 /**
- * Farming Falmouth Speciality Crops — order backend.
+ * Farming Falmouth Specialty Crops — order backend.
  *
  * GitHub Pages is static hosting: it can serve the form but cannot store an
  * order or count down remaining units. This script is the piece that can.
@@ -115,6 +115,8 @@ function readConfig_() {
   const out = {};
   sh.getDataRange().getValues().slice(1).forEach(r => { if (r[0]) out[r[0]] = r[1]; });
   if (out.deliveryThu instanceof Date) out.deliveryThu = iso_(out.deliveryThu);
+  if (out.deliveryDate instanceof Date) out.deliveryDate = iso_(out.deliveryDate);
+  if (out.orderCloseDate instanceof Date) out.orderCloseDate = iso_(out.orderCloseDate);
   return out;
 }
 
@@ -133,11 +135,11 @@ function iso_(d) {
   return Utilities.formatDate(d, ss_().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
 }
 
-/** Monday of the week containing the delivery Thursday — the grouping key. */
-function weekKey_(deliveryThu) {
-  const thu = new Date(deliveryThu + 'T12:00:00');
-  thu.setDate(thu.getDate() - 3);
-  return thu.toISOString().slice(0, 10);
+/** Monday of the week containing the delivery date — the grouping key. */
+function weekKey_(deliveryDate) {
+  const d = new Date(deliveryDate + 'T12:00:00');
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
 }
 
 /* ---------------- orders ---------------- */
@@ -171,7 +173,8 @@ function claimed_(weekKey) {
 /** What a restaurant is allowed to see: the week, and what's still available. */
 function publicWeek_() {
   const cfg = readConfig_();
-  const wk = weekKey_(cfg.deliveryThu);
+  const delivDate = cfg.deliveryDate || cfg.deliveryThu;
+  const wk = weekKey_(delivDate);
   const taken = claimed_(wk);
   const crops = readCatalog_()
     .filter(c => c.offered)
@@ -180,13 +183,20 @@ function publicWeek_() {
       id: c.id, name: c.name, section: c.section, unit: c.unit, price: c.price,
       remaining: c.cap === null ? null : Math.max(0, c.cap - (taken[c.id] || 0))
     }));
-  return { config: { deliveryThu: cfg.deliveryThu }, crops: crops };
+  return {
+    config: {
+      deliveryDate: delivDate,
+      deliveryThu: cfg.deliveryThu,
+      orderCloseDate: cfg.orderCloseDate || null
+    },
+    crops: crops
+  };
 }
 
 /** Everything the farm sees. Never reachable without the admin key. */
 function adminData_() {
   const cfg = readConfig_();
-  const wk = weekKey_(cfg.deliveryThu);
+  const wk = weekKey_(cfg.deliveryDate || cfg.deliveryThu);
   return {
     config: cfg,
     weekKey: wk,
@@ -215,7 +225,7 @@ function placeOrder_(order) {
 
   try {
     const cfg = readConfig_();
-    const wk = weekKey_(cfg.deliveryThu);
+    const wk = weekKey_(cfg.deliveryDate || cfg.deliveryThu);
     const cat = {}; readCatalog_().forEach(c => cat[c.id] = c);
     const taken = claimed_(wk);
 
@@ -251,7 +261,7 @@ function placeOrder_(order) {
     const sh = ss_().getSheetByName(ORDERS);
     sh.getRange(sh.getLastRow() + 1, 1, rows.length, 18).setValues(rows);
 
-    const total = rows.reduce((s, r) => s + r[11], 0);
+    const total = rows.reduce((s, r) => s + r[15], 0);
     notify_(order, rows, orderId, total);
     return { orderId: orderId, lines: rows.length, total: total };
   } finally {
@@ -327,13 +337,16 @@ function setupSheets() {
 
   let cfg = ss.getSheetByName(CONFIG) || ss.insertSheet(CONFIG);
   cfg.clear();
-  const d = new Date();
-  d.setDate(d.getDate() + ((4 - d.getDay() + 7) % 7 || 7));
-  cfg.getRange('A1:B4').setValues([
+  const nextThur = new Date();
+  nextThur.setDate(nextThur.getDate() + ((4 - nextThur.getDay() + 7) % 7 || 7));
+  const nextWed = new Date(nextThur);
+  nextWed.setDate(nextThur.getDate() - 1);
+  cfg.getRange('A1:B5').setValues([
     ['Setting', 'Value'],
-    ['deliveryThu', iso_(d)],
+    ['deliveryDate', iso_(nextThur)],
+    ['orderCloseDate', iso_(nextWed)],
     ['notifyEmail', Session.getActiveUser().getEmail()],
-    ['farmName', 'Farming Falmouth Speciality Crops']
+    ['farmName', 'Farming Falmouth Specialty Crops']
   ]);
   cfg.getRange('A1:B1').setFontWeight('bold');
   cfg.setFrozenRows(1);

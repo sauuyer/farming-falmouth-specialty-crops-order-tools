@@ -3,20 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Farm console &mdash; Farming Falmouth Speciality Crops</title>
+<title>Farm console &mdash; Farming Falmouth Specialty Crops</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="public/favicon.ico">
 <link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
 <header class="top">
   <div class="in">
-    <h1>Farming Falmouth Speciality Crops</h1>
+    <div class="brand">
+      <picture>
+        <source srcset="assets/logo.svg" type="image/svg+xml">
+        <img src="assets/logo.png" alt="" class="logo" onerror="this.style.display='none'">
+      </picture>
+      <h1>Farming Falmouth Specialty Crops Order Management</h1>
+    </div>
     <div class="dates">
       <div class="date"><span class="lab">Delivery week</span><b id="dWeek">&mdash;</b></div>
-      <div class="date flag"><span class="lab">Order by Wednesday</span><b id="dOrder">&mdash;</b></div>
-      <div class="date"><span class="lab">Pick up or delivery Thursday</span><b id="dDeliver">&mdash;</b></div>
+      <div class="date flag"><span class="lab" id="labOrder">Order by</span><b id="dOrder">&mdash;</b></div>
+      <div class="date"><span class="lab" id="labDeliver">Pick up or delivery</span><b id="dDeliver">&mdash;</b></div>
     </div>
   </div>
   <nav class="tabs" id="tabs" role="tablist">

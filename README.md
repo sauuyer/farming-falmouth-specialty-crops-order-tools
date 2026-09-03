@@ -1,4 +1,4 @@
-# Farming Falmouth Speciality Crops — weekly order system
+# Farming Falmouth Specialty Crops — weekly order system
 
 Two pages on GitHub Pages, one Google Sheet behind them.
 

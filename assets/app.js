@@ -1,4 +1,4 @@
-/* Farming Falmouth Speciality Crops — front end.
+/* Farming Falmouth Specialty Crops — front end.
    Each page sets window.MODE ("restaurant" or "admin") before loading this.
    API_URL comes from config.js. */
 
@@ -34,14 +34,15 @@ const parseISO = s => new Date(s + "T12:00:00");
 const md = d => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 function weekDates() {
-  const thu = parseISO(config.deliveryThu || new Date().toISOString().slice(0, 10));
-  const wed = new Date(thu); wed.setDate(thu.getDate() - 1);
-  const mon = new Date(thu); mon.setDate(thu.getDate() - 3);
+  const delivDate = parseISO(config.deliveryDate || config.deliveryThu || new Date().toISOString().slice(0, 10));
+  const closeDate = config.orderCloseDate ? parseISO(config.orderCloseDate) : null;
+  const mon = new Date(delivDate);
+  mon.setDate(delivDate.getDate() - ((delivDate.getDay() + 6) % 7));
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
   const span = mon.getMonth() === sun.getMonth()
     ? md(mon) + "–" + sun.getDate()
     : md(mon) + " – " + md(sun);
-  return { thu, wed, mon, span };
+  return { delivDate, closeDate, mon, span };
 }
 
 /* remaining for a crop, from whichever shape this page has loaded */
@@ -109,9 +110,23 @@ function renderKeyPrompt() {
 /* ---------- render ---------- */
 function paintHeader() {
   const w = weekDates();
+  const labOrder = document.getElementById("labOrder");
+  const labDeliver = document.getElementById("labDeliver");
   $("#dWeek").textContent = booted ? w.span : "—";
-  $("#dOrder").textContent = booted ? md(w.wed) : "—";
-  $("#dDeliver").textContent = booted ? md(w.thu) : "—";
+  if (booted) {
+    if (w.closeDate) {
+      if (labOrder) labOrder.textContent = "Order by " + w.closeDate.toLocaleDateString("en-US", { weekday: "long" });
+      $("#dOrder").textContent = md(w.closeDate);
+    } else {
+      if (labOrder) labOrder.textContent = "Order by";
+      $("#dOrder").textContent = "—";
+    }
+    if (labDeliver) labDeliver.textContent = "Pick up or delivery " + w.delivDate.toLocaleDateString("en-US", { weekday: "long" });
+    $("#dDeliver").textContent = md(w.delivDate);
+  } else {
+    $("#dOrder").textContent = "—";
+    $("#dDeliver").textContent = "—";
+  }
 }
 
 function render() {
@@ -130,16 +145,19 @@ function render() {
 }
 
 function settingsHTML() {
-  let h = `<p class="lede">Turn on whatever you can cut this week. Set the unit and the price the way
-    you'd say it out loud to a chef. Units available is optional — fill it in and the order form counts
-    down as orders arrive, so two restaurants can't claim the same thirty pounds of shishitos.</p>
+  const dateErr = config.deliveryDate && config.orderCloseDate && config.orderCloseDate > config.deliveryDate;
+  let h = `<p class="lede">Switch on what you can cut this week, then set the price and unit exactly as
+    you'd quote them to a chef. Units available is optional: leave it blank and chefs can order any
+    amount, or set a number and the form counts down as orders come in so you don't sell the same
+    crop twice.</p>
     <div class="orderbox" style="margin-top:0;margin-bottom:26px">
       <h2>Delivery week</h2>
       <div class="grid2">
-        <div class="f"><label for="thuPick">Delivery Thursday</label>
-          <input class="inp" type="date" id="thuPick" value="${esc(config.deliveryThu || "")}"></div>
-        <div class="f"><label>Orders close</label>
-          <div style="padding:7px 0;font-weight:600">Wednesday ${md(weekDates().wed)}</div></div>
+        <div class="f"><label for="delivPick">Delivery / pickup date</label>
+          <input class="inp" type="date" id="delivPick" value="${esc(config.deliveryDate || config.deliveryThu || "")}"></div>
+        <div class="f"><label for="closePick">Orders close</label>
+          <input class="inp" type="date" id="closePick" value="${esc(config.orderCloseDate || "")}"></div>
+        <div class="f wide" id="dateErr">${dateErr ? '<div class="notice warn" style="margin:6px 0 0">Order close date is after the delivery date.</div>' : ""}</div>
       </div>
     </div>`;
 
@@ -149,12 +167,13 @@ function settingsHTML() {
     h += `<section class="section">
       <div class="section-head"><h2>${sec}</h2>
         <span class="count">${on} of ${items.length} offered this week</span></div>
-      <div class="panel">`;
+      <div class="panel">
+      ${items.length ? `<div class="frow-head"><div></div><div></div><div>Unit</div><div>Price per unit</div><div>Units available</div></div>` : ""}`;
     items.forEach(c => {
       const rem = remainingOf(c);
       h += `<div class="frow ${c.offered ? "on" : "off"}">
         <div><button class="toggle" data-toggle="${c.id}" aria-pressed="${c.offered}">
-          <span class="dot">✓</span>${c.offered ? "Offering this week" : "Not this week"}</button></div>
+          <span class="dot">✓</span>${c.offered ? "Offering this week" : "Not offering this week"}</button></div>
         <div class="cropname-cell"><div class="cropname">${esc(c.name)}</div></div>
         <div><span class="fieldlab">Unit</span><input class="inp" type="text" value="${esc(c.unit)}"
           data-unit="${c.id}" ${c.offered ? "" : "disabled"} aria-label="${esc(c.name)} unit"></div>
@@ -181,22 +200,62 @@ function settingsHTML() {
     }
     h += `</div></section>`;
   });
+  h += `<div class="save-footer"><div id="saveBar"></div>
+    <button class="btn ghost" id="saveAll">Save all changes</button></div>`;
   return h;
 }
 
 function orderFormHTML(isPreview) {
   if (sent) {
-    return `<div class="done"><b>Order received</b>
-      <p>${sent.orderId} — ${sent.lines} line${sent.lines > 1 ? "s" : ""}, ${money(sent.total)}.
-      The farm has a copy and will be in touch if anything comes up short.</p>
+    return `<div class="done">
+      <p>Thank you for ordering local specialty crops through Farming Falmouth. We will start harvesting your produce and will be in touch shortly.</p>
+      <p class="order-ref">Reference: ${esc(sent.orderId)}</p>
       <button class="btn ghost" id="again">Place another order</button></div>`;
   }
+
   const list = MODE === "restaurant" ? crops : catalog.filter(c => c.offered);
+  const w = weekDates();
+  const closeDay = w.closeDate
+    ? w.closeDate.toLocaleDateString("en-US", { weekday: "long" })
+    : "Wednesday";
+  const delivDay = w.delivDate.toLocaleDateString("en-US", { weekday: "long" });
+
   let h = isPreview
     ? `<p class="lede">Exactly what a restaurant sees at your order link. They can't reach this
        console, the offerings settings, or the order records.</p>`
-    : `<p class="lede">Here's what's coming out of the field this week. Enter quantities for what you
-       want and leave the rest blank.</p>`;
+    : `<div class="intro-block">
+        <p>Please fill out this form to place your weekly order with Farming Falmouth for specialty crops from the farm.</p>
+        <p>Orders must be placed by ${closeDay}. Pickup or delivery takes place the following ${delivDay}. Crops can be picked up at the Patch (578 Locustfield Road, East Falmouth, MA&nbsp;02536) by appointment only.</p>
+        <p>Choices vary each week based on what's in season.</p>
+        <p>Completing this form reserves your requested crops based on availability. Orders are fulfilled first-come, first-served — if we're unable to fill part of your order, we'll follow up to arrange a refund or credit toward the following week.</p>
+        <p>Questions? Contact Jean Talbert at <a href="mailto:jean@farmingfalmouth.org">jean@farmingfalmouth.org</a> or <a href="tel:+15082741187">508-274-1187</a>.</p>
+      </div>`;
+
+  const addrVis = draft._fulfill === "Delivery";
+  h += `<div class="orderbox" style="margin-bottom:20px"><h2>Your details</h2><div class="grid2">
+      <div class="f"><label for="oRest">Company name <abbr title="Required" class="req">*</abbr></label>
+        <input class="inp" id="oRest" type="text" value="${esc(draft._rest || "")}" autocomplete="organization" aria-required="true">
+        <div class="ferr" id="err-rest"></div></div>
+      <div class="f"><label for="oName">Contact name <abbr title="Required" class="req">*</abbr></label>
+        <input class="inp" id="oName" type="text" value="${esc(draft._name || "")}" autocomplete="name" aria-required="true">
+        <div class="ferr" id="err-name"></div></div>
+      <div class="f"><label for="oEmail">Contact email <abbr title="Required" class="req">*</abbr></label>
+        <input class="inp" id="oEmail" type="email" value="${esc(draft._email || "")}" autocomplete="email" aria-required="true">
+        <div class="ferr" id="err-email"></div></div>
+      <div class="f"><label for="oPhone">Contact phone <abbr title="Required" class="req">*</abbr></label>
+        <input class="inp" id="oPhone" type="tel" value="${esc(draft._phone || "")}" autocomplete="tel" aria-required="true">
+        <div class="ferr" id="err-phone"></div></div>
+      <div class="f wide"><label>Fulfillment <abbr title="Required" class="req">*</abbr></label>
+        <div class="radio-group">
+          <label class="radio-label"><input type="radio" name="oFulfill" value="Pickup"${draft._fulfill === "Pickup" ? " checked" : ""}> Pickup</label>
+          <label class="radio-label"><input type="radio" name="oFulfill" value="Delivery"${draft._fulfill === "Delivery" ? " checked" : ""}> Delivery</label>
+        </div>
+        <div class="ferr" id="err-fulfill"></div></div>
+      <div class="f wide" id="oAddrWrap"${addrVis ? "" : ' style="display:none"'}>
+        <label for="oAddr">Delivery address &amp; instructions <abbr title="Required" class="req">*</abbr></label>
+        <textarea class="inp" id="oAddr" placeholder="123 Main St, Falmouth MA 02540 — leave at back door">${esc(draft._addr || "")}</textarea>
+        <div class="ferr" id="err-addr"></div></div>
+    </div></div>`;
 
   if (!list.length) return h + `<div class="panel"><div class="empty"><b>Nothing posted yet</b>
     Check back once the farm sets this week's list.</div></div>`;
@@ -226,31 +285,19 @@ function orderFormHTML(isPreview) {
 
   const picked = list.filter(c => (draft[c.id] || 0) > 0);
   const total = picked.reduce((s, c) => s + draft[c.id] * c.price, 0);
-  const addrVis = draft._fulfill === "Delivery";
-  h += `<div class="orderbox"><h2>Your details</h2><div class="grid2">
-      <div class="f"><label for="oRest">Company name</label><input class="inp" id="oRest" type="text"
-        value="${esc(draft._rest || "")}" placeholder="Cardinal &amp; Crow"></div>
-      <div class="f"><label for="oName">Contact name</label><input class="inp" id="oName" type="text"
-        value="${esc(draft._name || "")}" placeholder="Sam Smith"></div>
-      <div class="f"><label for="oEmail">Contact email</label><input class="inp" id="oEmail" type="email"
-        value="${esc(draft._email || "")}" placeholder="sam@cardinal-crow.com"></div>
-      <div class="f"><label for="oPhone">Contact phone</label><input class="inp" id="oPhone" type="tel"
-        value="${esc(draft._phone || "")}" placeholder="508-555-0144"></div>
-      <div class="f wide"><label>Fulfillment</label><div class="radio-group">
-        <label class="radio-label"><input type="radio" name="oFulfill" value="Pickup"${draft._fulfill === "Pickup" ? " checked" : ""}> Pickup</label>
-        <label class="radio-label"><input type="radio" name="oFulfill" value="Delivery"${draft._fulfill === "Delivery" ? " checked" : ""}> Delivery</label>
-      </div></div>
-      <div class="f wide" id="oAddrWrap"${addrVis ? "" : ' style="display:none"'}><label for="oAddr">Delivery address &amp; instructions</label>
-        <textarea class="inp" id="oAddr" placeholder="123 Main St, Falmouth MA 02540 — leave at back door">${esc(draft._addr || "")}</textarea></div>
-      <div class="f wide"><label for="oNotes">Special requests or notes</label><textarea class="inp" id="oNotes"
-        placeholder="No changes once submitted.">${esc(draft._notes || "")}</textarea></div>
-      <div class="f wide"><label class="check-label"><input type="checkbox" id="oTerms"${draft._terms ? " checked" : ""}>&ensp;I understand
+  h += `<div class="orderbox" style="margin-top:20px">
+      <p class="pay-note">The total shown is an estimate. An invoice will be presented at pickup or delivery, and payment happens then.</p>
+      <div class="f"><label for="oNotes">Anything else</label>
+        <textarea class="inp" id="oNotes" placeholder="Allergies, preferred varieties, timing — no changes once submitted.">${esc(draft._notes || "")}</textarea></div>
+      <div class="f" style="margin-top:14px"><label class="check-label">
+        <input type="checkbox" id="oTerms"${draft._terms ? " checked" : ""}>&ensp;I understand
         orders are fulfilled first-come, first-served. My order is not confirmed until I hear back from Farming Falmouth.</label></div>
-    </div><div id="oErr"></div></div>
+      <div id="oErr"></div>
+    </div>
   <div class="stickybar"><div class="tot">${money(total)}<small>${picked.length
-      ? picked.length + (picked.length === 1 ? " crop" : " crops") + " selected"
+      ? picked.length + (picked.length === 1 ? " crop" : " crops") + " · Estimate"
       : "Nothing selected yet"}</small></div>
-    <button class="btn big" id="place" ${picked.length ? "" : "disabled"}>Send order</button></div>`;
+    <button class="btn big" id="place" ${picked.length ? "" : "disabled"}>Reserve crops</button></div>`;
   return h;
 }
 
@@ -388,8 +435,9 @@ document.addEventListener("click", async e => {
     const c = catalog.find(x => x.id === tog.dataset.toggle);
     c.offered = !c.offered;
     render();
-    try { await api({ action: "saveCrop", key: adminKey, id: c.id, patch: { offered: c.offered } }); }
-    catch (err) { c.offered = !c.offered; render(); alert(err.message); }
+    setSaveState("saving");
+    try { await api({ action: "saveCrop", key: adminKey, id: c.id, patch: { offered: c.offered } }); setSaveState("saved"); }
+    catch (err) { c.offered = !c.offered; render(); setSaveState("err", err.message); }
     return;
   }
   if (t.dataset.add) {
@@ -410,6 +458,13 @@ document.addEventListener("click", async e => {
         sort: Math.max(0, ...catalog.filter(c => c.section === crop.section).map(c => c.sort)) + 10 });
       addingTo = null; render();
     } catch (err) { t.disabled = false; t.textContent = "Add"; alert(err.message); }
+    return;
+  }
+
+  if (t.id === "saveAll") {
+    if (!Object.keys(pending).length) { setSaveState("saved"); return; }
+    setSaveState("saving");
+    flushPending();
     return;
   }
 
@@ -438,21 +493,22 @@ document.addEventListener("click", async e => {
     const addr   = ($("#oAddr") ? $("#oAddr").value.trim() : "");
     const terms  = $("#oTerms") && $("#oTerms").checked;
 
-    const firstEmpty = !rest ? "#oRest" : !name ? "#oName" : !email ? "#oEmail" : !phone ? "#oPhone" : null;
-    if (firstEmpty) {
-      $("#oErr").innerHTML = `<div class="notice err" style="margin:14px 0 0">Please fill in all contact fields before sending.</div>`;
-      $(firstEmpty).focus(); return;
-    }
-    if (!fulfill) {
-      $("#oErr").innerHTML = `<div class="notice err" style="margin:14px 0 0">Please choose pickup or delivery.</div>`;
+    const setFErr = (id, msg) => { const el = document.getElementById(id); if (el) el.textContent = msg; };
+    ["err-rest","err-name","err-email","err-phone","err-fulfill","err-addr"].forEach(id => setFErr(id, ""));
+    const errs = [];
+    if (!rest)  { setFErr("err-rest",    "Required"); errs.push("#oRest"); }
+    if (!name)  { setFErr("err-name",    "Required"); errs.push("#oName"); }
+    if (!email) { setFErr("err-email",   "Required"); errs.push("#oEmail"); }
+    if (!phone) { setFErr("err-phone",   "Required"); errs.push("#oPhone"); }
+    if (!fulfill) setFErr("err-fulfill", "Please choose pickup or delivery");
+    if (fulfill === "Delivery" && !addr) { setFErr("err-addr", "Required"); errs.push("#oAddr"); }
+    if (errs.length || !fulfill || (fulfill === "Delivery" && !addr)) {
+      if (errs.length) $(errs[0]).focus();
       return;
     }
-    if (fulfill === "Delivery" && !addr) {
-      $("#oErr").innerHTML = `<div class="notice err" style="margin:14px 0 0">Please add a delivery address and any instructions.</div>`;
-      $("#oAddr").focus(); return;
-    }
     if (!terms) {
-      $("#oErr").innerHTML = `<div class="notice err" style="margin:14px 0 0">Please check the acknowledgment before sending.</div>`;
+      const oErr = $("#oErr");
+      if (oErr) oErr.innerHTML = `<div class="notice err" style="margin:14px 0 0">Please check the acknowledgment before sending.</div>`;
       return;
     }
     const list = MODE === "restaurant" ? crops : catalog.filter(c => c.offered);
@@ -474,13 +530,13 @@ document.addEventListener("click", async e => {
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      t.disabled = false; t.textContent = "Send order";
+      t.disabled = false; t.textContent = "Reserve crops";
       $("#oErr").innerHTML = `<div class="notice warn" style="margin:14px 0 0">${esc(err.message)}</div>`;
     }
   }
 });
 
-let timers = {};
+let timers = {}, pending = {};
 document.addEventListener("input", e => {
   const t = e.target, d = t.dataset;
 
@@ -503,10 +559,24 @@ document.addEventListener("input", e => {
   if (t.id === "oAddr")   { draft._addr  = t.value; return; }
   if (t.id === "oNotes")  { draft._notes = t.value; return; }
 
-  if (t.id === "thuPick" && t.value) {
-    config.deliveryThu = t.value; paintHeader();
-    debounce("cfg", () => api({ action: "saveConfig", key: adminKey,
-      config: { deliveryThu: t.value } }).catch(err => alert(err.message)));
+  if (t.id === "delivPick" && t.value) {
+    config.deliveryDate = t.value; paintHeader();
+    const eDiv = document.getElementById("dateErr");
+    if (eDiv) eDiv.innerHTML = (config.orderCloseDate && config.orderCloseDate > t.value)
+      ? '<div class="notice warn" style="margin:6px 0 0">Order close date is after the delivery date.</div>' : "";
+    setSaveState("saving");
+    debounce("cfg-deliv", () => api({ action: "saveConfig", key: adminKey, config: { deliveryDate: t.value } })
+      .then(() => setSaveState("saved")).catch(err => setSaveState("err", err.message)));
+    return;
+  }
+  if (t.id === "closePick" && t.value) {
+    config.orderCloseDate = t.value; paintHeader();
+    const eDiv = document.getElementById("dateErr");
+    if (eDiv) eDiv.innerHTML = (config.deliveryDate && t.value > config.deliveryDate)
+      ? '<div class="notice warn" style="margin:6px 0 0">Order close date is after the delivery date.</div>' : "";
+    setSaveState("saving");
+    debounce("cfg-close", () => api({ action: "saveConfig", key: adminKey, config: { orderCloseDate: t.value } })
+      .then(() => setSaveState("saved")).catch(err => setSaveState("err", err.message)));
     return;
   }
 
@@ -520,13 +590,32 @@ document.addEventListener("input", e => {
   }
   if (!id) return;
   Object.assign(catalog.find(c => c.id === id), patch);
+  setSaveState("saving");
   debounce(id, () => api({ action: "saveCrop", key: adminKey, id, patch })
-    .catch(err => alert(err.message)));
+    .then(() => setSaveState("saved")).catch(err => setSaveState("err", err.message)));
 });
 
 function debounce(key, fn) {
   clearTimeout(timers[key]);
-  timers[key] = setTimeout(fn, 500);
+  pending[key] = fn;
+  timers[key] = setTimeout(() => { delete pending[key]; fn(); }, 500);
+}
+
+function flushPending() {
+  Object.keys(pending).forEach(k => {
+    clearTimeout(timers[k]);
+    delete timers[k];
+    const fn = pending[k];
+    delete pending[k];
+    fn();
+  });
+}
+
+function setSaveState(status, msg) {
+  const el = document.getElementById("saveBar");
+  if (!el) return;
+  el.className = "savemsg " + (status === "saved" ? "ok" : status === "saving" ? "saving" : "err");
+  el.textContent = status === "saved" ? "Saved" : status === "saving" ? "Saving…" : "Couldn’t save" + (msg ? ": " + msg : "");
 }
 
 function updateBar() {
@@ -537,7 +626,7 @@ function updateBar() {
   const total = picked.reduce((s, c) => s + draft[c.id] * c.price, 0);
   bar.querySelector(".tot").firstChild.nodeValue = money(total);
   bar.querySelector(".tot small").textContent = picked.length
-    ? picked.length + (picked.length === 1 ? " crop" : " crops") + " selected"
+    ? picked.length + (picked.length === 1 ? " crop" : " crops") + " · Estimate"
     : "Nothing selected yet";
   bar.querySelector("#place").disabled = picked.length === 0;
 }

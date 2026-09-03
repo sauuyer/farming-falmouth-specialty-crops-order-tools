@@ -1,4 +1,4 @@
-# Farming Falmouth Speciality Crops — order system
+# Farming Falmouth Specialty Crops — order system
 
 Weekly produce ordering between a small farm in Falmouth, MA and local restaurants.
 The farm posts what it can cut each week; chefs order against that list; orders land in
@@ -53,6 +53,12 @@ new public action needs the same scrutiny.
 
 **Units are free text** ("1 lb", "0.5 lb", "per flower", "per stem"). Farmers price the
 way they'd say it out loud. Don't normalize to a unit enum.
+
+## Working with the user
+
+**Do not commit or push unless explicitly told to.** Stage files when asked, show the
+diff or status, and wait for the user to say "commit" or "push" before running those
+commands.
 
 ## Working on this
 
