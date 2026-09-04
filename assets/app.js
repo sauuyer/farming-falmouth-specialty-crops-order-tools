@@ -288,10 +288,10 @@ function orderFormHTML(isPreview) {
   h += `<div class="orderbox" style="margin-top:20px">
       <p class="pay-note">The total shown is an estimate. An invoice will be presented at pickup or delivery, and payment happens then.</p>
       <div class="f"><label for="oNotes">Anything else</label>
-        <textarea class="inp" id="oNotes" placeholder="Allergies, preferred varieties, timing — no changes once submitted.">${esc(draft._notes || "")}</textarea></div>
+        <textarea class="inp" id="oNotes" placeholder="Please make any order notes here.">${esc(draft._notes || "")}</textarea></div>
       <div class="f" style="margin-top:14px"><label class="check-label">
         <input type="checkbox" id="oTerms"${draft._terms ? " checked" : ""}>&ensp;I understand
-        orders are fulfilled first-come, first-served. My order is not confirmed until I hear back from Farming Falmouth.</label></div>
+        orders are fulfilled first-come, first-served, and that my order is not confirmed until I hear back from Farming Falmouth.</label></div>
       <div id="oErr"></div>
     </div>
   <div class="stickybar"><div class="tot">${money(total)}<small>${picked.length
