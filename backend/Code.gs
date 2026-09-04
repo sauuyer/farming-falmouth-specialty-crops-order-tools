@@ -10,9 +10,10 @@
  * not answer. Do not "fix" it to application/json.
  */
 
-const CATALOG = 'Catalog';
-const ORDERS  = 'Orders';
-const CONFIG  = 'Config';
+const CATALOG    = 'Catalog';
+const ORDERS     = 'Orders';
+const CONFIG     = 'Config';
+const ORDER_META = 'OrderMeta';
 
 function ss_() { return SpreadsheetApp.getActive(); }
 function json_(o) {
@@ -38,6 +39,7 @@ function route_(req) {
     case 'saveCrop':   requireKey_(req.key); return saveCrop_(req.id, req.patch);
     case 'addCrop':    requireKey_(req.key); return addCrop_(req.crop);
     case 'saveConfig': requireKey_(req.key); return saveConfig_(req.config);
+    case 'saveMeta':   requireKey_(req.key); return saveOrderMeta_(req.orderId, req.patch);
   }
   throw new Error('Unknown action: ' + req.action);
 }
@@ -150,7 +152,8 @@ function readOrders_() {
   const rows = sh.getDataRange().getValues();
   rows.shift();
   return rows.filter(r => r[0]).map(r => ({
-    orderId: String(r[0]), placed: r[1], weekKey: String(r[2]),
+    orderId: String(r[0]), placed: r[1],
+    weekKey: r[2] instanceof Date ? iso_(r[2]) : String(r[2]),
     restaurant: String(r[3]), contact: String(r[4]),
     email: String(r[5] || ''), phone: String(r[6] || ''),
     fulfillment: String(r[7] || ''), deliveryAddress: String(r[8] || ''),
@@ -168,6 +171,35 @@ function claimed_(weekKey) {
     out[o.cropId] = (out[o.cropId] || 0) + o.qty;
   });
   return out;
+}
+
+function readOrderMeta_() {
+  const sh = ss_().getSheetByName(ORDER_META);
+  if (!sh || sh.getLastRow() < 2) return {};
+  const rows = sh.getDataRange().getValues();
+  rows.shift();
+  const out = {};
+  rows.filter(r => r[0]).forEach(r => {
+    out[String(r[0])] = { fulfilled: r[1] === true, farmNotes: String(r[2] || '') };
+  });
+  return out;
+}
+
+function saveOrderMeta_(orderId, patch) {
+  const sh = ss_().getSheetByName(ORDER_META);
+  if (!sh) throw new Error('OrderMeta tab not found — run setupSheets to create it.');
+  const ids = sh.getLastRow() > 1
+    ? sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().flat().map(String)
+    : [];
+  const i = ids.indexOf(String(orderId));
+  if (i > -1) {
+    const row = i + 2;
+    if ('fulfilled' in patch) sh.getRange(row, 2).setValue(patch.fulfilled);
+    if ('farmNotes' in patch) sh.getRange(row, 3).setValue(patch.farmNotes || '');
+  } else {
+    sh.appendRow([String(orderId), 'fulfilled' in patch ? patch.fulfilled : false, patch.farmNotes || '']);
+  }
+  return { orderId: String(orderId) };
 }
 
 /** What a restaurant is allowed to see: the week, and what's still available. */
@@ -197,12 +229,15 @@ function publicWeek_() {
 function adminData_() {
   const cfg = readConfig_();
   const wk = weekKey_(cfg.deliveryDate || cfg.deliveryThu);
+  const ordSh = ss_().getSheetByName(ORDERS);
   return {
     config: cfg,
     weekKey: wk,
     claimed: claimed_(wk),
     catalog: readCatalog_().sort((a, b) => a.sort - b.sort),
-    orders: readOrders_()
+    orders: readOrders_(),
+    orderMeta: readOrderMeta_(),
+    sheetIds: { orders: ordSh ? ordSh.getSheetId() : null }
   };
 }
 
@@ -350,6 +385,14 @@ function setupSheets() {
   ]);
   cfg.getRange('A1:B1').setFontWeight('bold');
   cfg.setFrozenRows(1);
+
+  let meta = ss.getSheetByName(ORDER_META) || ss.insertSheet(ORDER_META);
+  if (meta.getLastRow() === 0) {
+    meta.getRange('A1:C1').setValues([['Order ID', 'Fulfilled', 'Farm Notes']]).setFontWeight('bold');
+    meta.getRange('B:B').insertCheckboxes();
+    meta.setFrozenRows(1);
+    meta.autoResizeColumns(1, 3);
+  }
 
   SpreadsheetApp.getUi().alert(
     'Sheets are ready.\n\nNext: Project Settings > Script Properties > add ADMIN_KEY, ' +

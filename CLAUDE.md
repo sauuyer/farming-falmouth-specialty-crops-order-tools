@@ -12,7 +12,7 @@ everything.
 
 ```
 index.html   restaurant order form — the only URL chefs get
-admin.html   farm console: offerings / order form preview / order records
+admin.html   farm console: offerings / order form preview / weekly summary
 assets/app.js    shared by both pages; each sets window.MODE first
 assets/app.css   shared stylesheet
 assets/config.js the only file edited after deploy (API_URL, SHEET_URL)
@@ -20,7 +20,8 @@ backend/Code.gs  Apps Script JSON API; lives in the Sheet, not deployed from her
 ```
 
 Sheet tabs: **Catalog** (every crop ever offered), **Orders** (long format), **Config**
-(deliveryThu, notifyEmail, farmName).
+(deliveryDate, orderCloseDate, notifyEmail, farmName), **OrderMeta** (orderId → fulfilled,
+farmNotes — separate lifecycle from Orders; run `setupSheets()` to create it).
 
 ## Decisions that look wrong and aren't
 
@@ -78,8 +79,9 @@ means changing both.
 
 - The Claude artifact demo is a separate, self-contained copy of this UI running on a
   different storage layer. The two can drift. This repo is the source of truth.
-- Order status (`New / Packed / Delivered / Invoiced`) exists as an Orders column but
-  nothing in the UI reads or writes it.
+- The `status` column in Orders (`New / Packed / Delivered / Invoiced`) is not read or
+  written by the UI. Fulfillment state lives in **OrderMeta** instead (keyed by orderId,
+  stored as a checkbox in the weekly summary's expandable detail row).
 - No order cutoff enforcement — the Wednesday date is displayed, not enforced.
 - No per-restaurant pricing, no order minimum.
 - `admin.html` re-fetches everything after each write. Fine at this size; would need

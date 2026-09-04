@@ -200,6 +200,32 @@ td.dim{color:var(--muted)}
 tbody tr:last-child td{border-bottom:0}
 .num{text-align:right}
 
+/* weekly summary — sticky left columns */
+table.sum-tbl{border-collapse:separate;border-spacing:0;min-width:0}
+.st-col{position:sticky;background:var(--card);z-index:1}
+.sum-tbl thead .st-col{z-index:3}
+.st-c0{left:0;width:52px;min-width:52px;max-width:52px}
+.st-c1{left:52px;min-width:160px}
+.st-c2{left:212px;min-width:140px}
+.st-c3{left:352px;min-width:110px}
+.st-c4{left:462px;min-width:90px;box-shadow:2px 0 5px -2px rgba(0,0,0,.12)}
+.sum-row{cursor:pointer}
+.sum-row:hover>td{background:var(--g050)}
+.sum-row:hover>.st-col{background:var(--g050)}
+.sumrow>.st-col{background:var(--g050)}
+.sum-done>td{opacity:.65}
+.chk-cell{text-align:center;cursor:default}
+.expand-hint{font-size:11px;color:var(--g700);margin-top:2px}
+/* expandable detail row */
+.detail-row .detail-cell{padding:0;background:var(--g050)}
+.detail-box{padding:16px 20px;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.detail-dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:13px;align-content:start}
+.detail-dl dt{color:var(--muted);font-weight:500;white-space:nowrap}
+.detail-dl dd{margin:0;word-break:break-word}
+.detail-dl a{color:var(--g700)}
+.detail-notes{flex:1;min-width:220px}
+.detail-lab{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:500}
+
 .empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:14px}
 .empty b{display:block;color:var(--ink);font-size:16px;font-weight:600;margin-bottom:5px}
 .notice{padding:11px 14px;border-radius:6px;font-size:13.5px;margin-bottom:18px}

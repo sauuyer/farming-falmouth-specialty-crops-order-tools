@@ -6,6 +6,7 @@ const SECTIONS = ["Herbs", "Flowers", "Other Produce"];
 
 let tab = "settings", sent = null, addingTo = null, adminKey = "", summaryWeek = null;
 let config = {}, catalog = [], crops = [], orders = [], claimedMap = {};
+let orderMeta = {}, expandedSet = new Set(), ordersSheetGid = null;
 let draft = {};
 let booted = false;
 
@@ -76,6 +77,8 @@ async function loadAdmin() {
   try {
     const d = await api({ action: "admin", key: adminKey });
     config = d.config; catalog = d.catalog; orders = d.orders; claimedMap = d.claimed;
+    orderMeta = d.orderMeta || {};
+    ordersSheetGid = (d.sheetIds && d.sheetIds.orders != null) ? d.sheetIds.orders : null;
     booted = true;
     sessionStorage.setItem("ff_key", adminKey);
     return true;
@@ -140,8 +143,7 @@ function render() {
   if (MODE === "restaurant") v.innerHTML = orderFormHTML(false);
   else if (tab === "form") v.innerHTML = orderFormHTML(true);
   else if (tab === "settings") v.innerHTML = settingsHTML();
-  else if (tab === "summary") v.innerHTML = summaryHTML();
-  else v.innerHTML = ordersHTML();
+  else v.innerHTML = summaryHTML();
 }
 
 function settingsHTML() {
@@ -301,122 +303,139 @@ function orderFormHTML(isPreview) {
   return h;
 }
 
-function ordersHTML() {
-  const rows = orders.slice().sort((a, b) => String(b.placed).localeCompare(String(a.placed)));
-  const wk = weekDates().mon.toISOString().slice(0, 10);
-  const wkRows = rows.filter(r => r.weekKey === wk);
-  const weekTotal = wkRows.reduce((s, r) => s + r.lineTotal, 0);
-  const allTotal = rows.reduce((s, r) => s + r.lineTotal, 0);
-  const rests = new Set(wkRows.map(r => r.restaurant)).size;
-
-  let h = `<p class="lede">One row per crop ordered — never one column per crop. A new offering adds a
-    row here, never a column, which is what keeps this pivotable into a season-over-season sales report
-    instead of a widening field of blank cells.</p>
-    <div class="stats">
-      <div class="stat"><span class="lab">This week</span><b>${money(weekTotal)}</b></div>
-      <div class="stat"><span class="lab">Restaurants ordering</span><b>${rests}</b></div>
-      <div class="stat"><span class="lab">Season to date</span><b>${money(allTotal)}</b></div>
-    </div>
-    <div class="toolbar"><button class="btn ghost" id="csv">Download CSV</button>
-      <a class="btn ghost" href="${esc(SHEET_URL)}" target="_blank" rel="noopener"
-         style="text-decoration:none;display:inline-block">Open the spreadsheet</a></div>`;
-
-  if (!rows.length) return h + `<div class="panel"><div class="empty"><b>No orders yet</b>
-    Send one from the order form preview and the rows land here.</div></div>`;
-
-  h += `<div class="scroll"><table><thead><tr><th>Order ID</th><th>Placed</th><th>Delivery week</th>
-    <th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Fulfillment</th><th>Delivery address</th>
-    <th>Crop</th><th>Section</th><th>Unit</th>
-    <th class="num">Unit price</th><th class="num">Qty</th><th class="num">Line total</th>
-    </tr></thead><tbody>`;
-  rows.forEach(r => {
-    const placed = r.placed ? new Date(r.placed).toLocaleDateString("en-US",
-      { month: "short", day: "numeric" }) : "";
-    h += `<tr><td>${esc(r.orderId)}</td><td>${placed}</td><td>${esc(r.weekKey)}</td>
-      <td>${esc(r.restaurant)}</td><td>${esc(r.contact)}</td><td>${esc(r.email)}</td>
-      <td>${esc(r.phone)}</td><td>${esc(r.fulfillment)}</td><td class="addr">${esc(r.deliveryAddress)}</td>
-      <td>${esc(r.name)}</td><td>${esc(r.section)}</td><td>${esc(r.unit)}</td>
-      <td class="num">${money(r.price)}</td>
-      <td class="num">${r.qty}</td><td class="num">${money(r.lineTotal)}</td></tr>`;
-  });
-  return h + `</tbody></table></div>`;
-}
-
 function summaryHTML() {
   const allWeeks = [...new Set(orders.map(r => r.weekKey))].sort((a, b) => b.localeCompare(a));
   const currentWk = weekDates().mon.toISOString().slice(0, 10);
   if (!summaryWeek || !allWeeks.includes(summaryWeek))
     summaryWeek = allWeeks.includes(currentWk) ? currentWk : (allWeeks[0] || currentWk);
 
-  let h = `<p class="lede">One row per company — quantities ordered per crop and total owed for the selected week.</p>`;
+  const allTotal = orders.reduce((s, r) => s + r.lineTotal, 0);
+  const baseSheetUrl = SHEET_URL.replace(/#.*$/, '');
+  const ordersUrl = ordersSheetGid != null ? baseSheetUrl + '#gid=' + ordersSheetGid : baseSheetUrl;
 
+  let h = `<div class="toolbar">`;
   if (allWeeks.length) {
-    h += `<div class="toolbar"><label for="sumWeek" style="font-size:13px;color:var(--muted);margin-right:8px">Week of</label>
+    h += `<label for="sumWeek" style="font-size:13px;color:var(--muted);margin-right:4px">Week of</label>
       <select class="inp" id="sumWeek" style="width:auto">`;
     allWeeks.forEach(wk => {
-      h += `<option value="${esc(wk)}"${wk === summaryWeek ? " selected" : ""}>${esc(wk)}</option>`;
+      const mon = parseISO(wk);
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      const label = mon.getMonth() === sun.getMonth()
+        ? md(mon) + '–' + sun.getDate()
+        : md(mon) + ' – ' + md(sun);
+      h += `<option value="${esc(wk)}"${wk === summaryWeek ? ' selected' : ''}>${label}</option>`;
     });
-    h += `</select></div>`;
+    h += `</select>`;
   }
+  h += `<button class="btn ghost" id="csv">Download CSV</button>
+    <a class="btn ghost" href="${esc(ordersUrl)}" target="_blank" rel="noopener"
+       style="text-decoration:none;display:inline-block">Open Orders sheet ↗</a></div>`;
 
   const wkRows = orders.filter(r => r.weekKey === summaryWeek);
-  if (!wkRows.length) return h + `<div class="panel"><div class="empty">
-    <b>No orders for this week yet</b>Orders placed by restaurants will appear here once
-    the week is active.</div></div>`;
-
+  const weekTotal = wkRows.reduce((s, r) => s + r.lineTotal, 0);
   const companies = [...new Set(wkRows.map(r => r.restaurant))].sort();
 
+  h += `<div class="stats">
+    <div class="stat"><span class="lab">Week revenue</span><b>${money(weekTotal)}</b></div>
+    <div class="stat"><span class="lab">Companies</span><b>${companies.length}</b></div>
+    <div class="stat"><span class="lab">Season to date</span><b>${money(allTotal)}</b></div>
+  </div>`;
+
+  if (!wkRows.length) return h + `<div class="panel"><div class="empty">
+    <b>No orders for this week yet</b><p>Orders placed by restaurants will appear here.</p></div></div>`;
+
   const cropMeta = {};
-  wkRows.forEach(r => { cropMeta[r.cropId] = { name: r.name, section: r.section, unit: r.unit, price: r.price }; });
+  wkRows.forEach(r => {
+    cropMeta[r.cropId] = { name: r.name, section: r.section, unit: r.unit, price: r.price };
+  });
   const cropIds = Object.keys(cropMeta).sort((a, b) => {
     const si = SECTIONS.indexOf(cropMeta[a].section), sj = SECTIONS.indexOf(cropMeta[b].section);
     return si !== sj ? si - sj : cropMeta[a].name.localeCompare(cropMeta[b].name);
   });
 
-  const matrix = {}, companyTotal = {};
+  const matrix = {}, companyTotal = {}, companyInfo = {}, companyOrders = {};
   wkRows.forEach(r => {
-    if (!matrix[r.restaurant]) matrix[r.restaurant] = {};
+    if (!matrix[r.restaurant]) { matrix[r.restaurant] = {}; companyOrders[r.restaurant] = []; }
     const cell = matrix[r.restaurant][r.cropId] || { qty: 0, lineTotal: 0 };
     cell.qty += r.qty; cell.lineTotal += r.lineTotal;
     matrix[r.restaurant][r.cropId] = cell;
     companyTotal[r.restaurant] = (companyTotal[r.restaurant] || 0) + r.lineTotal;
+    if (!companyInfo[r.restaurant]) companyInfo[r.restaurant] = r;
+    if (!companyOrders[r.restaurant].find(o => o.orderId === r.orderId))
+      companyOrders[r.restaurant].push(r);
   });
 
-  const weekTotal = wkRows.reduce((s, r) => s + r.lineTotal, 0);
-  h += `<div class="stats">
-    <div class="stat"><span class="lab">Week revenue</span><b>${money(weekTotal)}</b></div>
-    <div class="stat"><span class="lab">Companies</span><b>${companies.length}</b></div>
-  </div>`;
+  const NCOLS = 5 + cropIds.length;
 
-  h += `<div class="scroll"><table><thead><tr>
-    <th>Company</th><th>Contact</th><th>Fulfillment</th>`;
+  h += `<div class="scroll"><table class="sum-tbl"><thead><tr>
+    <th class="st-col st-c0" title="Fulfilled">✓</th>
+    <th class="st-col st-c1">Company</th>
+    <th class="st-col st-c2">Contact</th>
+    <th class="st-col st-c3">Fulfillment</th>
+    <th class="st-col st-c4 num">Total owed</th>`;
   cropIds.forEach(id => {
     h += `<th class="num">${esc(cropMeta[id].name)}
       <div class="colsub">${esc(cropMeta[id].unit)} · ${money(cropMeta[id].price)}</div></th>`;
   });
-  h += `<th class="num">Total owed</th></tr></thead><tbody>`;
+  h += `</tr></thead><tbody>`;
 
   companies.forEach(company => {
-    const info = wkRows.find(r => r.restaurant === company);
-    h += `<tr><td><b>${esc(company)}</b></td>
-      <td>${esc(info.contact)}<div class="colsub">${esc(info.phone)}</div></td>
-      <td>${esc(info.fulfillment)}${info.deliveryAddress
-        ? `<div class="colsub addr">${esc(info.deliveryAddress)}</div>` : ""}</td>`;
+    const info = companyInfo[company];
+    const cOrders = companyOrders[company];
+    const primaryId = cOrders[0].orderId;
+    const meta = orderMeta[primaryId] || {};
+    const fulfilled = !!meta.fulfilled;
+    const isExpanded = expandedSet.has(company);
+
+    h += `<tr class="sum-row${fulfilled ? ' sum-done' : ''}" data-expand="${esc(company)}">
+      <td class="st-col st-c0 chk-cell">
+        <input type="checkbox" data-fulfill="${esc(primaryId)}"${fulfilled ? ' checked' : ''}
+          title="Mark order fulfilled"></td>
+      <td class="st-col st-c1"><b>${esc(company)}</b>
+        <div class="colsub expand-hint">${isExpanded ? '▲ less' : '▼ details'}</div></td>
+      <td class="st-col st-c2">${esc(info.contact)}<div class="colsub">${esc(info.phone)}</div></td>
+      <td class="st-col st-c3">${esc(info.fulfillment)}</td>
+      <td class="st-col st-c4 num"><b>${money(companyTotal[company] || 0)}</b></td>`;
     cropIds.forEach(id => {
       const cell = (matrix[company] || {})[id];
       h += cell ? `<td class="num">${cell.qty}</td>` : `<td class="num dim">—</td>`;
     });
-    h += `<td class="num"><b>${money(companyTotal[company] || 0)}</b></td></tr>`;
+    h += `</tr>`;
+
+    if (isExpanded) {
+      const farmNotes = meta.farmNotes || '';
+      h += `<tr class="detail-row"><td class="detail-cell" colspan="${NCOLS}"><div class="detail-box">`;
+      cOrders.forEach(o => {
+        const placedStr = o.placed
+          ? new Date(o.placed).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+          : '';
+        h += `<dl class="detail-dl">
+          <dt>Order ID</dt><dd>${esc(o.orderId)}</dd>
+          <dt>Placed</dt><dd>${esc(placedStr)}</dd>
+          ${info.email ? `<dt>Email</dt><dd><a href="mailto:${esc(info.email)}">${esc(info.email)}</a></dd>` : ''}
+          ${o.deliveryAddress ? `<dt>Address</dt><dd>${esc(o.deliveryAddress)}</dd>` : ''}
+          ${o.notes ? `<dt>Order notes</dt><dd>${esc(o.notes)}</dd>` : ''}
+        </dl>`;
+      });
+      h += `<div class="detail-notes">
+        <label class="detail-lab" for="fn-${esc(primaryId)}">Farm notes</label>
+        <textarea class="inp" id="fn-${esc(primaryId)}" data-farm-notes="${esc(primaryId)}"
+          placeholder="Internal notes — not visible to the restaurant" rows="3">${esc(farmNotes)}</textarea>
+      </div></div></td></tr>`;
+    }
   });
 
-  h += `<tr class="sumrow"><td colspan="3"><b>Total</b></td>`;
+  h += `<tr class="sumrow">
+    <td class="st-col st-c0"></td>
+    <td class="st-col st-c1"><b>Total</b></td>
+    <td class="st-col st-c2"></td>
+    <td class="st-col st-c3"></td>
+    <td class="st-col st-c4 num"><b>${money(weekTotal)}</b></td>`;
   cropIds.forEach(id => {
-    const total = wkRows.filter(r => r.cropId === id).reduce((s, r) => s + r.qty, 0);
-    h += `<td class="num"><b>${total}</b></td>`;
+    const tot = wkRows.filter(r => r.cropId === id).reduce((s, r) => s + r.qty, 0);
+    h += `<td class="num"><b>${tot}</b></td>`;
   });
-  h += `<td class="num"><b>${money(weekTotal)}</b></td></tr>`;
-
-  return h + `</tbody></table></div>`;
+  return h + `</tr></tbody></table></div>`;
 }
 
 /* ---------- events ---------- */
@@ -484,6 +503,14 @@ document.addEventListener("click", async e => {
     return;
   }
 
+  const expandRow = t.closest("[data-expand]");
+  if (expandRow && !t.closest("input, button, a, textarea, select")) {
+    const company = expandRow.dataset.expand;
+    if (expandedSet.has(company)) expandedSet.delete(company); else expandedSet.add(company);
+    render();
+    return;
+  }
+
   if (t.id === "place") {
     const rest   = $("#oRest").value.trim();
     const name   = $("#oName").value.trim();
@@ -539,6 +566,17 @@ document.addEventListener("click", async e => {
 let timers = {}, pending = {};
 document.addEventListener("input", e => {
   const t = e.target, d = t.dataset;
+
+  if (d.farmNotes) {
+    const orderId = d.farmNotes;
+    if (!orderMeta[orderId]) orderMeta[orderId] = {};
+    orderMeta[orderId].farmNotes = t.value;
+    debounce('fn-' + orderId, () =>
+      api({ action: "saveMeta", key: adminKey, orderId, patch: { farmNotes: t.value } })
+        .catch(err => alert("Couldn't save farm notes: " + err.message))
+    );
+    return;
+  }
 
   if (d.qty !== undefined) {
     const list = MODE === "restaurant" ? crops : catalog;
@@ -635,6 +673,16 @@ function updateBar() {
 
 document.addEventListener("change", e => {
   const t = e.target;
+  if (t.dataset.fulfill) {
+    const orderId = t.dataset.fulfill;
+    const checked = t.checked;
+    if (!orderMeta[orderId]) orderMeta[orderId] = {};
+    orderMeta[orderId].fulfilled = checked;
+    render();
+    api({ action: "saveMeta", key: adminKey, orderId, patch: { fulfilled: checked } })
+      .catch(err => { orderMeta[orderId].fulfilled = !checked; render(); alert("Couldn't save: " + err.message); });
+    return;
+  }
   if (t.name === "oFulfill") {
     draft._fulfill = t.value;
     const wrap = document.getElementById("oAddrWrap");
