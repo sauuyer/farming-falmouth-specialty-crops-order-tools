@@ -613,9 +613,11 @@ function flushPending() {
 
 function setSaveState(status, msg) {
   const el = document.getElementById("saveBar");
+  const btn = document.getElementById("saveAll");
   if (!el) return;
   el.className = "savemsg " + (status === "saved" ? "ok" : status === "saving" ? "saving" : "err");
-  el.textContent = status === "saved" ? "Saved" : status === "saving" ? "Saving…" : "Couldn’t save" + (msg ? ": " + msg : "");
+  el.textContent = status === "saved" ? "🌱 Saved" : status === "saving" ? "Saving…" : "Couldn’t save" + (msg ? ": " + msg : "");
+  if (btn) btn.className = status === "saved" ? "btn" : "btn ghost";
 }
 
 function updateBar() {
