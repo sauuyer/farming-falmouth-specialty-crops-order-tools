@@ -233,7 +233,8 @@ function orderFormHTML(isPreview) {
         <p>Questions? Contact Jean Talbert at <a href="mailto:jean@farmingfalmouth.org">jean@farmingfalmouth.org</a> or <a href="tel:+15082741187">508-274-1187</a>.</p>
       </div>`;
 
-  const addrVis = draft._fulfill === "Delivery";
+  const addrVis   = draft._fulfill === "Delivery";
+  const pickupVis = draft._fulfill === "Pickup";
   h += `<div class="orderbox" style="margin-bottom:20px"><h2>Your details</h2><div class="grid2">
       <div class="f"><label for="oRest">Company name <abbr title="Required" class="req">*</abbr></label>
         <input class="inp" id="oRest" type="text" value="${esc(draft._rest || "")}" autocomplete="organization" aria-required="true">
@@ -257,6 +258,9 @@ function orderFormHTML(isPreview) {
         <label for="oAddr">Delivery address &amp; instructions <abbr title="Required" class="req">*</abbr></label>
         <textarea class="inp" id="oAddr" placeholder="123 Main St, Falmouth MA 02540 — leave at back door">${esc(draft._addr || "")}</textarea>
         <div class="ferr" id="err-addr"></div></div>
+      <div class="f wide pickup-info" id="oPickupInfo" aria-live="polite"${pickupVis ? "" : ' style="display:none"'}>
+        <p>Crops can be picked up at the Patch (578 Locustfield Road, East Falmouth, MA&nbsp;02536) by appointment only. Please contact Jean Talbert at <a href="mailto:jean@farmingfalmouth.org">jean@farmingfalmouth.org</a> or <a href="tel:+15082741187">508-274-1187</a> to schedule a pick up time.</p>
+      </div>
     </div></div>`;
 
   if (!list.length) return h + `<div class="panel"><div class="empty"><b>Nothing posted yet</b>
@@ -687,6 +691,8 @@ document.addEventListener("change", e => {
     draft._fulfill = t.value;
     const wrap = document.getElementById("oAddrWrap");
     if (wrap) wrap.style.display = t.value === "Delivery" ? "" : "none";
+    const pickupInfo = document.getElementById("oPickupInfo");
+    if (pickupInfo) pickupInfo.style.display = t.value === "Pickup" ? "" : "none";
   }
   if (t.id === "oTerms") draft._terms = t.checked;
   if (t.id === "sumWeek") { summaryWeek = t.value; render(); }

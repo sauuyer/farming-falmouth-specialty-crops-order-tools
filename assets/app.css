@@ -165,6 +165,9 @@ textarea.inp{min-height:62px;resize:vertical}
 .check-label input[type=checkbox]{accent-color:var(--g700);width:15px;height:15px;margin-top:2px;flex:none}
 abbr.req{text-decoration:none;color:var(--stop);font-style:normal}
 .ferr{color:var(--stop);font-size:12.5px;margin-top:3px;min-height:1.2em}
+.pickup-info{font-size:13.5px;color:var(--body);line-height:1.55}
+.pickup-info p{margin:0}
+.pickup-info a{color:var(--g700)}
 .intro-block{margin:0 0 24px}
 .intro-block p{margin:0 0 10px;font-size:14px;color:var(--body)}
 .intro-block p:last-child{margin-bottom:0}
