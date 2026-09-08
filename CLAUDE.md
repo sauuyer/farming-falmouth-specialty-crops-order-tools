@@ -55,6 +55,12 @@ new public action needs the same scrutiny.
 **Units are free text** ("1 lb", "0.5 lb", "per flower", "per stem"). Farmers price the
 way they'd say it out loud. Don't normalize to a unit enum.
 
+**The Patch pickup address appears in two places on purpose.** The intro-block paragraph
+("Orders must be placed by…") mentions it for orientation before any selection is made.
+The `#oPickupInfo` block surfaces it again — with Jean's contact details — at the moment
+a chef actually chooses Pickup. The two copies serve different moments; do not collapse
+them into one. If the address ever changes, update both.
+
 ## Working with the user
 
 **Do not commit or push unless explicitly told to.** Stage files when asked, show the

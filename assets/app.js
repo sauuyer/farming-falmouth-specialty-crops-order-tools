@@ -222,16 +222,18 @@ function orderFormHTML(isPreview) {
     : "Wednesday";
   const delivDay = w.delivDate.toLocaleDateString("en-US", { weekday: "long" });
 
+  const introBlock = `<div class="intro-block${isPreview ? " preview-intro" : ""}">
+      ${isPreview ? '<p class="preview-intro-label">What chefs read first</p>' : ""}
+      <p>Please fill out this form to place your weekly order with Farming Falmouth for specialty crops from the farm.</p>
+      <p>Orders must be placed by ${closeDay}. Pickup or delivery takes place the following ${delivDay}. Crops can be picked up at the Patch (578 Locustfield Road, East Falmouth, MA&nbsp;02536) by appointment only.</p>
+      <p>Choices vary each week based on what's in season.</p>
+      <p>Completing this form reserves your requested crops based on availability. Orders are fulfilled first-come, first-served — if we're unable to fill part of your order, we'll follow up to arrange a refund or credit toward the following week.</p>
+      <p>Questions? Contact Jean Talbert at <a href="mailto:jean@farmingfalmouth.org">jean@farmingfalmouth.org</a> or <a href="tel:+15082741187">508-274-1187</a>.</p>
+    </div>`;
   let h = isPreview
     ? `<p class="lede">Exactly what a restaurant sees at your order link. They can't reach this
-       console, the offerings settings, or the order records.</p>`
-    : `<div class="intro-block">
-        <p>Please fill out this form to place your weekly order with Farming Falmouth for specialty crops from the farm.</p>
-        <p>Orders must be placed by ${closeDay}. Pickup or delivery takes place the following ${delivDay}. Crops can be picked up at the Patch (578 Locustfield Road, East Falmouth, MA&nbsp;02536) by appointment only.</p>
-        <p>Choices vary each week based on what's in season.</p>
-        <p>Completing this form reserves your requested crops based on availability. Orders are fulfilled first-come, first-served — if we're unable to fill part of your order, we'll follow up to arrange a refund or credit toward the following week.</p>
-        <p>Questions? Contact Jean Talbert at <a href="mailto:jean@farmingfalmouth.org">jean@farmingfalmouth.org</a> or <a href="tel:+15082741187">508-274-1187</a>.</p>
-      </div>`;
+       console, the offerings settings, or the order records.</p>${introBlock}`
+    : introBlock;
 
   const addrVis   = draft._fulfill === "Delivery";
   const pickupVis = draft._fulfill === "Pickup";
@@ -303,7 +305,7 @@ function orderFormHTML(isPreview) {
   <div class="stickybar"><div class="tot">${money(total)}<small>${picked.length
       ? picked.length + (picked.length === 1 ? " crop" : " crops") + " · Estimate"
       : "Nothing selected yet"}</small></div>
-    <button class="btn big" id="place" ${picked.length ? "" : "disabled"}>Reserve crops</button></div>`;
+    <button class="btn big" id="place"${isPreview || !picked.length ? " disabled" : ""}>Reserve crops</button>${isPreview ? '<span class="preview-note">Submission disabled in preview</span>' : ''}</div>`;
   return h;
 }
 
@@ -516,6 +518,11 @@ document.addEventListener("click", async e => {
   }
 
   if (t.id === "place") {
+    if (MODE === "admin" && tab === "form") {
+      const oErr = document.getElementById("oErr");
+      if (oErr) oErr.innerHTML = `<div class="notice warn" style="margin:14px 0 0">This is a preview — orders can't be submitted from the farm console.</div>`;
+      return;
+    }
     const rest   = $("#oRest").value.trim();
     const name   = $("#oName").value.trim();
     const email  = $("#oEmail").value.trim();
