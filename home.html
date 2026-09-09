@@ -15,14 +15,17 @@
 <style>
 .home-primary{margin:36px 0 0}
 .home-label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 14px}
-.home-console-link{display:inline-block;background:var(--g700);color:var(--on-accent);font-size:17px;font-weight:600;padding:14px 30px;border-radius:var(--r);text-decoration:none;letter-spacing:-.01em}
-.home-console-link:hover{background:var(--g600)}
+.home-console-link,.home-order-link{display:inline-block;background:var(--g700);color:var(--on-accent);font-size:17px;font-weight:600;padding:14px 30px;border-radius:var(--r);text-decoration:none;letter-spacing:-.01em}
+.home-console-link:hover,.home-order-link:hover{background:var(--g600)}
 .home-console-desc{font-size:14px;color:var(--body);margin:12px 0 0;max-width:54ch}
 .home-handout{margin-top:48px;padding-top:36px;border-top:1px solid var(--line)}
-.home-qr-card{display:inline-flex;flex-direction:column;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:24px}
+.home-qr-card{display:inline-flex;flex-direction:column;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:24px;margin-top:20px}
 .home-order-url{margin:0;font-size:13px;color:var(--body);word-break:break-all;max-width:260px;text-align:center}
 .home-order-url a{color:var(--g700);text-decoration:none}
 .home-order-url a:hover{text-decoration:underline}
+.home-center{display:flex;flex-direction:column;align-items:flex-start}
+.home-center > *{align-self:center}
+.home-center > .home-label,.home-center > .home-console-desc{align-self:flex-start}
 </style>
 </head>
 <body>
@@ -35,23 +38,24 @@
   </div>
 </header>
 <main style="padding-bottom:60px">
-  <div class="home-primary">
+  <div class="home-primary home-center">
     <p class="home-label">Farm console</p>
     <a class="home-console-link" href="admin.html">Open farm console →</a>
     <p class="home-console-desc">Manage this week's offerings, preview the order form, and review weekly orders.</p>
   </div>
 
-  <div class="home-handout">
+  <div class="home-handout home-center">
     <p class="home-label">Customer order form</p>
+    <a class="home-order-link" id="orderLink" href="./">Open order form →</a>
     <div class="home-qr-card">
       <canvas id="qrCanvas" width="200" height="200"
         aria-label="QR code for the customer order form">
         QR code for the customer order form — use the URL below to share the link.
       </canvas>
       <div id="qrErr" class="notice warn" style="display:none;margin:0;max-width:220px;text-align:center;font-size:13px">
-        QR code couldn't load — use the link below.
+        QR code couldn't load — use the link above.
       </div>
-      <p class="home-order-url"><a id="orderLink" href="./">Loading…</a></p>
+      <p class="home-order-url"><a id="orderUrl" href="./">Loading…</a></p>
       <button class="btn ghost" id="qrDownload">Download PNG</button>
       <div id="qrDlErr" class="notice warn" style="display:none;margin:0;max-width:220px;text-align:center;font-size:13px">
         Download failed — use the link above to copy the URL instead.
@@ -61,12 +65,14 @@
 </main>
 
 <!-- Set the order URL and register the service worker before touching the QR
-     library, so a CDN failure can't prevent either from working. -->
+     library, so a library failure can't prevent either from working. -->
 <script>
   var orderUrl = new URL('./', location.href).href;
   var link = document.getElementById('orderLink');
   link.href = orderUrl;
-  link.textContent = orderUrl;
+  var urlText = document.getElementById('orderUrl');
+  urlText.href = orderUrl;
+  urlText.textContent = orderUrl;
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(function() {});
@@ -81,8 +87,7 @@
   }
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"
-  onerror="showQrError()"></script>
+<script src="assets/qrcode.min.js" onerror="showQrError()"></script>
 
 <script>
   if (typeof QRCode === 'undefined') {

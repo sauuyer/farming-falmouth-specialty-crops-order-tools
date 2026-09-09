@@ -116,6 +116,11 @@ with `"sizes": "any"` because the logo is 358×300 and not at a standard PWA ico
 Proper 192×192 and 512×512 square icons would improve the home-screen appearance and
 should be added when the farm has finalised its icon artwork.
 
+**Vendored dependency:** `assets/qrcode.min.js` is `qrcode@1.4.4` (the last version with
+a browser UMD bundle; 1.5.x dropped it). Downloaded from jsDelivr. If it ever needs
+updating, fetch `https://cdn.jsdelivr.net/npm/qrcode@<version>/build/qrcode.min.js` and
+replace the file — confirm the `toCanvas` / `toDataURL` API is unchanged before deploying.
+
 ## Known gaps
 
 - The Claude artifact demo is a separate, self-contained copy of this UI running on a
