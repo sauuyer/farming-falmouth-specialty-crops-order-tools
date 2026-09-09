@@ -14,18 +14,18 @@
 <link rel="stylesheet" href="assets/app.css">
 <style>
 .home-primary{margin:36px 0 0}
-.home-label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 14px}
+.home-section-title{font-size:21px;font-weight:600;color:var(--ink);margin:0 0 10px;letter-spacing:-.018em}
 .home-console-link,.home-order-link{display:inline-block;background:var(--g700);color:var(--on-accent);font-size:17px;font-weight:600;padding:14px 30px;border-radius:var(--r);text-decoration:none;letter-spacing:-.01em}
 .home-console-link:hover,.home-order-link:hover{background:var(--g600)}
-.home-console-desc{font-size:14px;color:var(--body);margin:12px 0 0;max-width:54ch}
-.home-handout{margin-top:48px;padding-top:36px;border-top:1px solid var(--line)}
+.home-desc{font-size:14px;color:var(--body);margin:0 auto 18px;max-width:54ch;text-align:center}
+.home-handout{margin-top:56px;padding-top:44px;border-top:1px solid var(--line)}
 .home-qr-card{display:inline-flex;flex-direction:column;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:24px;margin-top:20px}
 .home-order-url{margin:0;font-size:13px;color:var(--body);word-break:break-all;max-width:260px;text-align:center}
 .home-order-url a{color:var(--g700);text-decoration:none}
 .home-order-url a:hover{text-decoration:underline}
-.home-center{display:flex;flex-direction:column;align-items:flex-start}
-.home-center > *{align-self:center}
-.home-center > .home-label,.home-center > .home-console-desc{align-self:flex-start}
+.home-center{display:flex;flex-direction:column;align-items:center}
+.home-footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);text-align:center}
+.home-footer a{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -39,13 +39,14 @@
 </header>
 <main style="padding-bottom:60px">
   <div class="home-primary home-center">
-    <p class="home-label">Farm console</p>
+    <h2 class="home-section-title">Farm console</h2>
+    <p class="home-desc">Manage this week's offerings, preview the order form, and review weekly orders.</p>
     <a class="home-console-link" href="admin.html">Open farm console →</a>
-    <p class="home-console-desc">Manage this week's offerings, preview the order form, and review weekly orders.</p>
   </div>
 
   <div class="home-handout home-center">
-    <p class="home-label">Customer order form</p>
+    <h2 class="home-section-title">Customer order form</h2>
+    <p class="home-desc">The weekly ordering form restaurants use to reserve crops.</p>
     <a class="home-order-link" id="orderLink" href="./">Open order form →</a>
     <div class="home-qr-card">
       <canvas id="qrCanvas" width="200" height="200"
@@ -62,6 +63,10 @@
       </div>
     </div>
   </div>
+
+  <footer class="home-footer">
+    Site built and maintained by <a href="mailto:sawyer@farmingfalmouth.org">Sawyer</a> — for technical issues with these tools only.
+  </footer>
 </main>
 
 <!-- Set the order URL and register the service worker before touching the QR
