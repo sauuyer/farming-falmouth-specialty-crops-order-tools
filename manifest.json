@@ -1,0 +1,15 @@
+{
+  "name": "Farming Falmouth Ordering Tools",
+  "short_name": "FF Orders",
+  "start_url": "./home.html",
+  "display": "standalone",
+  "background_color": "#F4F8F2",
+  "theme_color": "#2C6E45",
+  "icons": [
+    {
+      "src": "public/FF-logo.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2C6E45">
+<title>Farming Falmouth Specialty Crops Ordering Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="public/favicon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="public/apple-touch-icon.png">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+.home-primary{margin:36px 0 0}
+.home-label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 14px}
+.home-console-link{display:inline-block;background:var(--g700);color:var(--on-accent);font-size:17px;font-weight:600;padding:14px 30px;border-radius:var(--r);text-decoration:none;letter-spacing:-.01em}
+.home-console-link:hover{background:var(--g600)}
+.home-console-desc{font-size:14px;color:var(--body);margin:12px 0 0;max-width:54ch}
+.home-handout{margin-top:48px;padding-top:36px;border-top:1px solid var(--line)}
+.home-qr-card{display:inline-flex;flex-direction:column;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:24px}
+.home-order-url{margin:0;font-size:13px;color:var(--body);word-break:break-all;max-width:260px;text-align:center}
+.home-order-url a{color:var(--g700);text-decoration:none}
+.home-order-url a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="in">
+    <div class="brand">
+      <img src="public/FF-logo.png" alt="" class="logo">
+      <div><h1>Farming Falmouth Specialty Crops</h1><p class="page-sub">Ordering Tools</p></div>
+    </div>
+  </div>
+</header>
+<main style="padding-bottom:60px">
+  <div class="home-primary">
+    <p class="home-label">Farm console</p>
+    <a class="home-console-link" href="admin.html">Open farm console →</a>
+    <p class="home-console-desc">Manage this week's offerings, preview the order form, and review weekly orders.</p>
+  </div>
+
+  <div class="home-handout">
+    <p class="home-label">Customer order form</p>
+    <div class="home-qr-card">
+      <canvas id="qrCanvas" width="200" height="200"
+        aria-label="QR code for the customer order form">
+        QR code for the customer order form — use the URL below to share the link.
+      </canvas>
+      <div id="qrErr" class="notice warn" style="display:none;margin:0;max-width:220px;text-align:center;font-size:13px">
+        QR code couldn't load — use the link below.
+      </div>
+      <p class="home-order-url"><a id="orderLink" href="./">Loading…</a></p>
+      <button class="btn ghost" id="qrDownload">Download PNG</button>
+      <div id="qrDlErr" class="notice warn" style="display:none;margin:0;max-width:220px;text-align:center;font-size:13px">
+        Download failed — use the link above to copy the URL instead.
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Set the order URL and register the service worker before touching the QR
+     library, so a CDN failure can't prevent either from working. -->
+<script>
+  var orderUrl = new URL('./', location.href).href;
+  var link = document.getElementById('orderLink');
+  link.href = orderUrl;
+  link.textContent = orderUrl;
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(function() {});
+  }
+
+  function showQrError() {
+    document.getElementById('qrCanvas').style.display = 'none';
+    document.getElementById('qrErr').style.display = '';
+    var btn = document.getElementById('qrDownload');
+    btn.disabled = true;
+    btn.textContent = 'Download unavailable';
+  }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"
+  onerror="showQrError()"></script>
+
+<script>
+  if (typeof QRCode === 'undefined') {
+    showQrError();
+  } else {
+    try {
+      QRCode.toCanvas(document.getElementById('qrCanvas'), orderUrl, { width: 200, margin: 2 })
+        .catch(showQrError);
+    } catch (e) {
+      showQrError();
+    }
+
+    document.getElementById('qrDownload').onclick = function() {
+      document.getElementById('qrDlErr').style.display = 'none';
+      try {
+        QRCode.toDataURL(orderUrl, { width: 1200, margin: 4 }, function(err, dataUrl) {
+          if (err) { document.getElementById('qrDlErr').style.display = ''; return; }
+          var a = document.createElement('a');
+          a.href = dataUrl;
+          a.download = 'farming-falmouth-order-form.png';
+          a.click();
+        });
+      } catch (e) {
+        document.getElementById('qrDlErr').style.display = '';
+      }
+    };
+  }
+</script>
+</body>
+</html>

@@ -81,6 +81,41 @@ Design: Inter throughout, green palette defined as CSS custom properties at the 
 Other Produce — declared as `SECTIONS` in both `app.js` and `Code.gs`. Changing them
 means changing both.
 
+## Pages
+
+```
+home.html    Jean's launcher — farm console link + order form link + QR code
+             Has the manifest and service worker registration; no other page does.
+index.html   Customer order form — stays at the repo root. This URL is already
+             deployed and shared with restaurants; do not move it.
+admin.html   Farm console
+```
+
+**`home.html` is Jean's launcher, not a public front door.** Chefs get `index.html`
+directly and will never see it.
+
+**One manifest, on `home.html` only.** `start_url` is `./home.html`. The order form and
+console do not have their own manifests — chefs bookmark the form or scan the QR, they
+aren't installing anything.
+
+**The pass-through service worker (`sw.js`) caches nothing on purpose.** It exists solely
+to satisfy Chrome's PWA install criterion. Do not add caching: stale crop data would show
+chefs items that are sold out, and queued offline orders would bypass the `LockService`
+availability check in `placeOrder_()`. If you see it and think the offline support is
+unfinished — it isn't. It is deliberately omitted.
+
+**`navigator.onLine === true` is not a signal that the form will work.** It only reports
+whether the device has a network interface. A dead uplink, captive portal, or one bar in
+the walk-in all return `true`. The code therefore treats only `false` as meaningful
+(showing a dismissible offline banner). Never add logic that implies connectivity because
+`navigator.onLine` is truthy.
+
+**Icons:** `public/apple-touch-icon.png` is a 180×180 RGB PNG (no alpha) generated from
+`public/FF-logo.png` with a white background. The manifest references `public/FF-logo.png`
+with `"sizes": "any"` because the logo is 358×300 and not at a standard PWA icon size.
+Proper 192×192 and 512×512 square icons would improve the home-screen appearance and
+should be added when the farm has finalised its icon artwork.
+
 ## Known gaps
 
 - The Claude artifact demo is a separate, self-contained copy of this UI running on a

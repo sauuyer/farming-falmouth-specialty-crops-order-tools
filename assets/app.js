@@ -62,13 +62,21 @@ async function boot() {
       config = d.config; crops = d.crops;
       booted = true;
     } catch (e) {
-      $("#view").innerHTML = `<div class="notice err">Couldn't reach the farm: ${esc(e.message)}</div>`;
+      renderLoadError(boot, "Orders can't be placed until the crop list loads.");
       return;
     }
   } else {
     const saved = sessionStorage.getItem("ff_key");
-    if (saved) { adminKey = saved; if (!(await loadAdmin())) return renderKeyPrompt(); }
-    else return renderKeyPrompt();
+    if (saved) {
+      adminKey = saved;
+      try {
+        if (!(await loadAdmin())) return renderKeyPrompt();
+      } catch (e) {
+        return renderLoadError(boot, "The farm console couldn't load.");
+      }
+    } else {
+      return renderKeyPrompt();
+    }
   }
   render();
 }
@@ -83,9 +91,22 @@ async function loadAdmin() {
     sessionStorage.setItem("ff_key", adminKey);
     return true;
   } catch (e) {
-    sessionStorage.removeItem("ff_key");
-    return false;
+    // Only evict the saved key when the server explicitly rejected it.
+    // Network failures shouldn't log Jean out.
+    const authFail = e.message === "That key is not right." || e.message === "No ADMIN_KEY is set on the script yet.";
+    if (authFail) sessionStorage.removeItem("ff_key");
+    if (authFail) return false;
+    throw e;
   }
+}
+
+function renderLoadError(retryFn, note) {
+  $("#view").innerHTML = `<div class="panel" style="margin:24px 0"><div class="empty">
+    <b>Can’t reach the farm right now</b>
+    <p style="margin:6px 0 16px">${esc(note)} Check your connection and try again.</p>
+    <button class="btn" id="retryLoad">Try again</button>
+  </div></div>`;
+  document.getElementById("retryLoad").onclick = retryFn;
 }
 
 function renderKeyPrompt() {
@@ -102,9 +123,15 @@ function renderKeyPrompt() {
   $("#kgo").onclick = async () => {
     adminKey = $("#k").value.trim();
     $("#kgo").disabled = true; $("#kgo").textContent = "Checking…";
-    if (await loadAdmin()) render();
-    else {
-      $("#kerr").innerHTML = `<div class="notice err" style="margin:12px 0 0">That key isn't right.</div>`;
+    try {
+      const ok = await loadAdmin();
+      if (ok) render();
+      else {
+        $("#kerr").innerHTML = `<div class="notice err" style="margin:12px 0 0">That key isn’t right.</div>`;
+        $("#kgo").disabled = false; $("#kgo").textContent = "Open console";
+      }
+    } catch (e) {
+      $("#kerr").innerHTML = `<div class="notice err" style="margin:12px 0 0">Couldn’t reach the farm — check your connection and try again.</div>`;
       $("#kgo").disabled = false; $("#kgo").textContent = "Open console";
     }
   };
@@ -569,7 +596,7 @@ document.addEventListener("click", async e => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       t.disabled = false; t.textContent = "Reserve crops";
-      $("#oErr").innerHTML = `<div class="notice warn" style="margin:14px 0 0">${esc(err.message)}</div>`;
+      $("#oErr").innerHTML = `<div class="notice warn" style="margin:14px 0 0"><b>Order not saved.</b> ${esc(err.message)} Your selections are still here.</div>`;
     }
   }
 });
@@ -704,5 +731,22 @@ document.addEventListener("change", e => {
   if (t.id === "oTerms") draft._terms = t.checked;
   if (t.id === "sumWeek") { summaryWeek = t.value; render(); }
 });
+
+/* ---------- offline banner ----------
+   Only `false` is treated as meaningful. navigator.onLine === true proves
+   nothing — it reflects whether the device has a network interface, not
+   whether the uplink is healthy. */
+function showOfflineBanner() {
+  if (document.getElementById("offline-banner")) return;
+  const b = document.createElement("div");
+  b.id = "offline-banner";
+  b.className = "offline-banner";
+  b.setAttribute("role", "alert");
+  b.innerHTML = `<span>You’re offline — your order won’t send until you reconnect.</span><button class="offline-dismiss" aria-label="Dismiss">×</button>`;
+  b.querySelector(".offline-dismiss").onclick = () => b.remove();
+  document.body.insertBefore(b, document.body.firstChild);
+}
+window.addEventListener("offline", showOfflineBanner);
+window.addEventListener("online", () => { const b = document.getElementById("offline-banner"); if (b) b.remove(); });
 
 boot();
